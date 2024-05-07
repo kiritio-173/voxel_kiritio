@@ -37,25 +37,32 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 	// printf("  Point Cloud Segmentation Time: %s.\n\n", msg);
 	// ts.push_back(timer.GetElapsedSeconds());
 
-	// 更改step1: 将输入点云体素化，体素化点云并行进行点云分割处理，但目前未修改使输入数据类型与声明保持一致
+	// 更改step1: 将输入点云体素化，体素化点云并行进行点云分割处理，
 	double totalTime = 0.0;
 	CTimer timer;
 	char msg[1024];
-	const float voxel_size = 0.0;
+	const float voxel_size = 2;
+	cout<<"voxel"<<endl;
 	std::unordered_map<VOXEL_LOC, Voxel *> voxel_map;
 	initVoxel(data, voxel_size, voxel_map);
+	
 	/*************/
 	timer.Start();
-	cout<<endl<<endl;
+	cout<<endl;
 	/*************/
 	// 修改为并行执行
 	for (auto iter = voxel_map.begin(); iter != voxel_map.end(); iter++) {
 		// 创建一个体素滤波器
 		PointCloud<double> *cloud_filter = new PointCloud<double>;
+		
 		//可能不能直接调用此点云复制，数据结构可能不支持
-
-		copyPointCloud(iter->second->cloud, cloud_filter);
-
+		cout<<"copyPointCloud"<<endl;
+		cout<<iter->second->cloud->pts.size()<<endl;
+		
+		//cout<<"test point log"<<iter->second->cloud->pts[3].x<<endl;
+		copyPointCloud(*(iter->second->cloud), *cloud_filter);
+		cout<<"finish copy"<<endl;
+		cout<<"cloud_filter_size"<<cloud_filter->pts.size()<<endl;
 		pointCloudSegmentation(*cloud_filter, regions);
 		delete cloud_filter;
 
@@ -65,8 +72,6 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 		cout<<"Step3: Post Processing ..."<<endl;
 		postProcessing( planes, lines );
 
-		cout<<"Step3: Post Processing ..."<<endl;
-		postProcessing( planes, lines );
 	}
 	/*************/
 	totalTime += timer.GetElapsedSeconds();
@@ -101,7 +106,8 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 
 // 增加第一个输入参数PointCloud<double> &pointData
 void LineDetection3D::pointCloudSegmentation(PointCloud<double> &pointData, std::vector<std::vector<int> > &regions )
-{
+{	
+	this->pointNum=pointData.pts.size();
 	cout<<"----- Normal Calculation ..."<<endl;
 	PCAFunctions pcaer;
 	// 更改输入数据
@@ -120,18 +126,20 @@ void LineDetection3D::pointCloudSegmentation(PointCloud<double> &pointData, std:
 }
 
 void LineDetection3D::regionGrow( double thAngle, std::vector<std::vector<int> > &regions )
-{
+{	
+	
 	double thNormal = cos(thAngle);
-
 	// sort according to the curvature of points
 	std::vector<std::pair<int,double> > idxSorted( this->pointNum );
+	cout<<"pointNum="<<pointNum<<endl;
 	for ( int i=0; i<this->pointNum; ++i )
-	{
-		idxSorted[i].first = i;
-		idxSorted[i].second = pcaInfos[i].lambda0;
+	{	
+		std::pair<int,double> temp;
+		temp.first = i;
+		temp.second = pcaInfos[i].lambda0;
+		idxSorted.push_back(temp);
 	}
 	std::sort( idxSorted.begin(), idxSorted.end(), [](const std::pair<int,double>& lhs, const std::pair<int,double>& rhs) { return lhs.second < rhs.second; } );
-
 	// get the initial clusters
 	double percent = 0.9;
 	int idx = int(this->pointNum*percent);
@@ -296,10 +304,12 @@ void LineDetection3D::regionMerging( double thAngle, std::vector<std::vector<int
 		std::vector<std::vector<double> > pointDataCur(pointNumCur);
 		for ( int j=0; j<pointNumCur; ++j )
 		{
-			pointDataCur[j].resize(3);
-			pointDataCur[j][0] = this->pointData.pts[regions[i][j]].x;
-			pointDataCur[j][1] = this->pointData.pts[regions[i][j]].y;
-			pointDataCur[j][2] = this->pointData.pts[regions[i][j]].z;
+			// pointDataCur[j].resize(3);
+
+			pointDataCur.push_back({this->pointData.pts[regions[i][j]].x,this->pointData.pts[regions[i][j]].y,this->pointData.pts[regions[i][j]].z});
+			// pointDataCur[j][0] = this->pointData.pts[regions[i][j]].x;
+			// pointDataCur[j][1] = this->pointData.pts[regions[i][j]].y;
+			// pointDataCur[j][2] = this->pointData.pts[regions[i][j]].z;
 		}
 
 		PCAFunctions pcaer;

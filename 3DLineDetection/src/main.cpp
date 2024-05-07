@@ -37,11 +37,14 @@ void readDataFromFile( std::string filepath, PointCloud<double> &cloud )
 			//ptReader >> x >> y >> z >> nx >> ny >> nz;
 
 			cloud.pts.push_back(PointCloud<double>::PtData(x,y,z));
+			if(ptReader.peek()==EOF){
+				break;
+			}
 
 		}
 		ptReader.close();
 	}
-
+	//std::cout<<"point test"<<cloud.pts[0].x<<endl<<cloud.pts[2489795].x<<endl<<cloud.pts[2489797].x<<endl;
 	std::cout << "Total num of points: " << cloud.pts.size() << "\n";
 }
 
@@ -176,7 +179,7 @@ void writeOutRegions( string filePath, PointCloud<double> pointData,std::vector<
 }
 int main() 
 {
-	string fileData = "/home/gzz/zhu/ershuai/code/kuangshan_without_color_part1.txt";
+	string fileData = "/home/gzz/zhu/ershuai/code/test111.txt";
 	string fileOut  = "/home/gzz/zhu/ershuai/code/datasets";
 
 	// read in data

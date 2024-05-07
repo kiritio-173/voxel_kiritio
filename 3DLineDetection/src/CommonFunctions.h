@@ -61,7 +61,8 @@ public:
 
 /************************************************************************/
 // 体素相关结构体
-class VOXEL_LOC {
+class VOXEL_LOC 
+{
 public:
   int64_t x, y, z;
 
@@ -117,7 +118,7 @@ void initVoxel(
     const PointCloud<double> &input_cloud,
     const float voxel_size, std::unordered_map<VOXEL_LOC, Voxel *> &voxel_map); 
 
-void copyPointCloud(PointCloud<double> *cloud, PointCloud<double> *copy_container);
+void copyPointCloud(PointCloud<double> &cloud, PointCloud<double> &copy_container);
 
 /*******************************************************************************/
 #endif //_COMMON_FUNCTIONS_
