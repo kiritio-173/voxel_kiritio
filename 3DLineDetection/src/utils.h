@@ -40,6 +40,7 @@ struct PointCloud
 		T  x,y,z;
 
 		PtData(T xx, T yy, T zz) { x = xx; y = yy; z = zz;}
+		PtData(){};
 		PtData &operator =(const PtData &info)
 		{
 			this->x    = info.x;
@@ -49,7 +50,7 @@ struct PointCloud
 		}
 	};
 
-	std::vector<PtData>  pts;
+	std::vector<PtData> pts;
 
 	// operator =
 	PointCloud &operator =(const PointCloud &info)

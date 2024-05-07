@@ -27,7 +27,7 @@ public:
 
 	void run( PointCloud<double> &data, int k, std::vector<std::vector<int> > &regions, std::vector<PLANE> &planes, std::vector<std::vector<cv::Point3d> > &lines, std::vector<double> &ts );
 
-	void pointCloudSegmentation( std::vector<std::vector<int> > &regions );
+	void pointCloudSegmentation( PointCloud<double> &pointData, std::vector<std::vector<int> > &regions );
 
 	void planeBased3DLineDetection( std::vector<std::vector<int> > &regions, std::vector<PLANE> &planes );
 

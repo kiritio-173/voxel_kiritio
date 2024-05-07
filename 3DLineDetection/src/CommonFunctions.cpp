@@ -264,7 +264,7 @@ void PCAFunctions::Ori_PCA( PointCloud<double> &cloud, int k, std::vector<PCAInf
 			pcaInfos[i].idxAll[j] = idx;
 		}
 
-		int idx = out_indices[i][3];//????
+		int idx = out_indices[i][3];
 		dx = cloud.pts[idx].x - cloud.pts[i].x;
 		dy = cloud.pts[idx].y - cloud.pts[i].y;
 		dz = cloud.pts[idx].z - cloud.pts[i].z;
@@ -336,7 +336,6 @@ void PCAFunctions::MCMD_OutlierRemoval( std::vector<std::vector<double> > &point
 	double a = 1.4826;
 	double thRz = 2.5;
 	int num = pcaInfo.idxAll.size();
-
 	// ODs
 	cv::Matx31d h_mean( 0, 0, 0 );
 	for( int j = 0; j < pcaInfo.idxIn.size(); ++j )
@@ -383,7 +382,7 @@ void PCAFunctions::MCMD_OutlierRemoval( std::vector<std::vector<double> > &point
 
 	// 
 	pcaInfo.idxIn = idxInlier;
-} 
+}
 
 
 double PCAFunctions::meadian( std::vector<double> dataset )
@@ -396,5 +395,138 @@ double PCAFunctions::meadian( std::vector<double> dataset )
 	else
 	{
 		return (dataset[dataset.size()/2] + dataset[dataset.size()/2 + 1])/2.0;
+	}
+}
+
+// 体素下采样
+void down_sampling_voxel(
+						PointCloud<double> &pl_feat,
+                         double voxel_size) {
+  int intensity = rand() % 255;
+  if (voxel_size < 0.01) {
+    return;
+  }
+  std::unordered_map<VOXEL_LOC, M_POINT> feat_map;
+  uint plsize = pl_feat.pts.size();
+
+  for (uint i = 0; i < plsize; i++) {
+	//更改数据格式
+	// PointCloud<double>::PtData &p_c = pl_feat.pts[i];
+
+	double *temp_coor = new double [3];
+	temp_coor[0] = pl_feat.pts[i].x; 
+	temp_coor[1] = pl_feat.pts[i].y;
+	temp_coor[2] = pl_feat.pts[i].z;
+    double loc_xyz[3];
+    for (int j = 0; j < 3; j++) {
+      if (j == 0) {
+		loc_xyz[j] = temp_coor[0] / voxel_size;
+	  }
+	  else if (j == 1) {
+		loc_xyz[j] = temp_coor[1] / voxel_size; M_POINT
+	  }
+	  else {
+		loc_xyz[j] = temp_coor[2] / voxel_size;
+	  }
+      if (loc_xyz[j] < 0) {
+        loc_xyz[j] -= 1.0;
+      }
+    }
+
+    VOXEL_LOC position((int64_t)loc_xyz[0], (int64_t)loc_xyz[1],
+                       (int64_t)loc_xyz[2]);
+    auto iter = feat_map.find(position);
+    if (iter != feat_map.end()) {
+      iter->second.xyz[0] += temp_coor[0];
+      iter->second.xyz[1] += temp_coor[1];
+      iter->second.xyz[2] += temp_coor[2];
+    //   iter->second.intensity += p_c.intensity;
+      iter->second.count++;
+    } else {
+      M_POINT anp;
+      anp.xyz[0] = temp_coor[0];
+      anp.xyz[1] = temp_coor[1];
+      anp.xyz[2] = temp_coor[2];
+    //   anp.intensity = p_c.intensity;
+      anp.count = 1;
+      feat_map[position] = anp;
+    }
+	delete temp_coor;
+  }
+  plsize = feat_map.size();
+  pl_feat.pts.clear();
+  pl_feat.pts.resize(plsize);
+
+  uint i = 0;
+  for (auto iter = feat_map.begin(); iter != feat_map.end(); ++iter) {
+    pl_feat.pts[i].x = iter->second.xyz[0] / iter->second.count;
+    pl_feat.pts[i].y = iter->second.xyz[1] / iter->second.count;
+    pl_feat.pts[i].z = iter->second.xyz[2] / iter->second.count;
+    // pl_feat[i].intensity = iter->second.intensity / iter->second.count;
+    i++;
+  }
+}
+
+//体素初始化， 将点云数据体素化
+void initVoxel(
+	const PointCloud<double> *input_cloud,
+    const float voxel_size, std::unordered_map<VOXEL_LOC, Voxel*> &voxel_map) {
+  cout<<endl<<"Building Voxel"<<endl;
+  srand((unsigned)time(NULL));
+  //无法确定能否通过size()方法的得到pointcloud对象中的pts数量
+  for (size_t i = 0; i < input_cloud->pts.size(); i++) {
+	//改变输入的数据结构，更换对应的读取方式
+	// const PointCloud<double>::PtData &p_c  = input_cloud->pts[i];
+	double *temp_coor = new double [3];
+	temp_coor[0] = input_cloud->pts[i].x; 
+	temp_coor[1] = input_cloud->pts[i].y;
+	temp_coor[2] = input_cloud->pts[i].z;
+    double loc_xyz[3];
+    for (int j = 0; j < 3; j++) {
+      if (j == 0) {
+		loc_xyz[j] = temp_coor[0] / voxel_size;
+	  }
+	  else if (j == 1) {
+		loc_xyz[j] = temp_coor[1] / voxel_size;
+	  }
+	  else {
+		loc_xyz[j] = temp_coor[2] / voxel_size;
+	  }
+      if (loc_xyz[j] < 0) {
+        loc_xyz[j] -= 1.0;
+      }
+    }
+    VOXEL_LOC position((int64_t)loc_xyz[0], (int64_t)loc_xyz[1],
+                       (int64_t)loc_xyz[2]);
+    auto iter = voxel_map.find(position);
+    if (iter != voxel_map.end()) {
+      voxel_map[position]->cloud->pts.push_back(input_cloud->pts[i]);
+    } else {
+      Voxel *voxel = new Voxel(voxel_size);
+      voxel_map[position] = voxel;
+      voxel_map[position]->voxel_origin[0] = position.x * voxel_size;
+      voxel_map[position]->voxel_origin[1] = position.y * voxel_size;
+      voxel_map[position]->voxel_origin[2] = position.z * voxel_size;
+      voxel_map[position]->cloud->pts.push_back(input_cloud->pts[i]);
+    //   int r = rand() % 256;
+    //   int g = rand() % 256;
+    //   int b = rand() % 256;
+    //   voxel_map[position]->voxel_color << r, g, b;
+    }
+	delete temp_coor;
+  }
+  for (auto iter = voxel_map.begin(); iter != voxel_map.end(); iter++) {
+    if (iter->second->cloud->pts.size() > 20) {
+      down_sampling_voxel(*(iter->second->cloud), 0.02);
+    }
+  }
+}
+
+
+void copyPointCloud(PointCloud<double> *cloud, PointCloud<double> *copy_container){
+	for (auto iter = 0; iter <= (*cloud).pts.size(); iter++ ){
+		copy_container->pts[iter].x = (*cloud).pts[iter].x;
+		copy_container->pts[iter].y = (*cloud).pts[iter].y;
+		copy_container->pts[iter].z = (*cloud).pts[iter].z;
 	}
 }

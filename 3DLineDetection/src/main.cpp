@@ -176,8 +176,8 @@ void writeOutRegions( string filePath, PointCloud<double> pointData,std::vector<
 }
 int main() 
 {
-	string fileData = "/home/ershuai/dataset/kuangshan_without_color_part1.txt";
-	string fileOut  = "/home/ershuai/dataset";
+	string fileData = "/home/gzz/zhu/ershuai/code/kuangshan_without_color_part1.txt";
+	string fileOut  = "/home/gzz/zhu/ershuai/code/datasets";
 
 	// read in data
 	PointCloud<double> pointData; 

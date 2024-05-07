@@ -24,49 +24,89 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 	this->k = k;
 
 	// step1: point cloud segmentation
+	// double totalTime = 0.0;
+	// CTimer timer;
+	// char msg[1024];
+	// timer.Start();
+	// cout<<endl<<endl;
+	// cout<<"Step1: Point Cloud Segmentation ..."<<endl;
+	// pointCloudSegmentation( regions );
+	// timer.Stop();
+	// totalTime += timer.GetElapsedSeconds();
+	// timer.PrintElapsedTimeMsg(msg);
+	// printf("  Point Cloud Segmentation Time: %s.\n\n", msg);
+	// ts.push_back(timer.GetElapsedSeconds());
+
+	// 更改step1: 将输入点云体素化，体素化点云并行进行点云分割处理，但目前未修改使输入数据类型与声明保持一致
 	double totalTime = 0.0;
 	CTimer timer;
 	char msg[1024];
-
+	const float voxel_size = 0.0;
+	std::unordered_map<VOXEL_LOC, Voxel *> voxel_map;
+	initVoxel(data, voxel_size, voxel_map);
+	/*************/
 	timer.Start();
 	cout<<endl<<endl;
-	cout<<"Step1: Point Cloud Segmentation ..."<<endl;
-	pointCloudSegmentation( regions );
-	timer.Stop();
+	/*************/
+	// 修改为并行执行
+	for (auto iter = voxel_map.begin(); iter != voxel_map.end(); iter++) {
+		// 创建一个体素滤波器
+		PointCloud<double> *cloud_filter = new PointCloud<double>;
+		//可能不能直接调用此点云复制，数据结构可能不支持
+
+		copyPointCloud(iter->second->cloud, cloud_filter);
+
+		pointCloudSegmentation(*cloud_filter, regions);
+		delete cloud_filter;
+
+		cout<<"Step2: Plane Based 3D LineDetection ..."<<endl;
+		planeBased3DLineDetection( regions, planes );
+
+		cout<<"Step3: Post Processing ..."<<endl;
+		postProcessing( planes, lines );
+
+		cout<<"Step3: Post Processing ..."<<endl;
+		postProcessing( planes, lines );
+	}
+	/*************/
 	totalTime += timer.GetElapsedSeconds();
 	timer.PrintElapsedTimeMsg(msg);
 	printf("  Point Cloud Segmentation Time: %s.\n\n", msg);
 	ts.push_back(timer.GetElapsedSeconds());
+	/*************/
+	// step1 end
 
-	// step2: plane based 3D line detection
-	timer.Start();
-	cout<<"Step2: Plane Based 3D LineDetection ..."<<endl;
-	planeBased3DLineDetection( regions, planes );
-	timer.Stop();
-	totalTime += timer.GetElapsedSeconds();
-	timer.PrintElapsedTimeMsg(msg);
-	printf("  Plane Based 3D LineDetection Time: %s.\n\n", msg);
-	ts.push_back(timer.GetElapsedSeconds());
+	// // step2: plane based 3D line detection
+	// timer.Start();
+	// cout<<"Step2: Plane Based 3D LineDetection ..."<<endl;
+	// planeBased3DLineDetection( regions, planes );
+	// timer.Stop();
+	// totalTime += timer.GetElapsedSeconds();
+	// timer.PrintElapsedTimeMsg(msg);
+	// printf("  Plane Based 3D LineDetection Time: %s.\n\n", msg);
+	// ts.push_back(timer.GetElapsedSeconds());
 
-	// step3: post processing
-	timer.Start();
-	cout<<"Step3: Post Processing ..."<<endl;
-	postProcessing( planes, lines );
-	timer.Stop();
-	totalTime += timer.GetElapsedSeconds();
-	timer.PrintElapsedTimeMsg(msg);
-	printf("  Post Processing Time: %s.\n\n", msg);
-	ts.push_back(timer.GetElapsedSeconds());
+	// // step3: post processing
+	// timer.Start();
+	// cout<<"Step3: Post Processing ..."<<endl;
+	// postProcessing( planes, lines );
+	// timer.Stop();
+	// totalTime += timer.GetElapsedSeconds();
+	// timer.PrintElapsedTimeMsg(msg);
+	// printf("  Post Processing Time: %s.\n\n", msg);
+	// ts.push_back(timer.GetElapsedSeconds());
 
 	printf("Total Time: %lf.\n\n", totalTime);
 }
 
-
-void LineDetection3D::pointCloudSegmentation( std::vector<std::vector<int> > &regions )
+// 增加第一个输入参数PointCloud<double> &pointData
+void LineDetection3D::pointCloudSegmentation(PointCloud<double> &pointData, std::vector<std::vector<int> > &regions )
 {
 	cout<<"----- Normal Calculation ..."<<endl;
 	PCAFunctions pcaer;
-	pcaer.Ori_PCA( this->pointData, this->k, this->pcaInfos, this->scale, this->magnitd );
+	// 更改输入数据
+	// pcaer.Ori_PCA( this->pointData, this->k, this->pcaInfos, this->scale, this->magnitd );
+	pcaer.Ori_PCA( pointData, this->k, this->pcaInfos, this->scale, this->magnitd );
 	
 	cout<<"----- Region Growing ..."<<endl;
 	double thAngle = 15.0/180.0*CV_PI;
@@ -78,7 +118,6 @@ void LineDetection3D::pointCloudSegmentation( std::vector<std::vector<int> > &re
 	regionMerging( thAnglePatch, regions );
 	//exportRegionCloud(regions);
 }
-
 
 void LineDetection3D::regionGrow( double thAngle, std::vector<std::vector<int> > &regions )
 {
@@ -171,7 +210,7 @@ void LineDetection3D::regionGrow( double thAngle, std::vector<std::vector<int> >
 	}
 }
 void LineDetection3D::exportRegionCloud(const std::vector<std::vector<int> > regions ,std::vector<PCAInfo> patches,double degThre ){
-	ofstream outRegionPoints("/home/ershuai/dataset/region_points_parll_gra.txt");
+	ofstream outRegionPoints("/home/gzz/zhu/ershuai/code/region_points_parll_gra.txt");
 	if(!outRegionPoints.is_open()){
 		std::cerr<<"failed to open file" <<std::endl;
 		return;
@@ -216,7 +255,7 @@ void LineDetection3D::exportRegionCloud(const std::vector<std::vector<int> > reg
 
 }
 void LineDetection3D::exportRegionCloud( const std::vector<std::vector<int> > regions){
-	ofstream outRegionPoints("/home/ershuai/dataset/regionPoints.txt");
+	ofstream outRegionPoints("/home/gzz/zhu/ershuai/code/datasets/regionPoints.txt");
 	if(!outRegionPoints.is_open()){
 		std::cerr<<"failed to open file" <<std::endl;
 		return;
