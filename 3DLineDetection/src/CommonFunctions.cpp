@@ -318,7 +318,7 @@ void PCAFunctions::PCASingle( std::vector<std::vector<double> > &pointData, PCAI
 	}
 	h_cov *=( 1.0 / k );
 
-	// eigenvector
+	// eigenvector 
 	cv::Matx33d h_cov_evectors;
 	cv::Matx31d h_cov_evals;
 	cv::eigen( h_cov, h_cov_evals, h_cov_evectors );
@@ -479,7 +479,6 @@ void initVoxel(
   cout<<"Building Voxel"<<endl;
   std::srand(std::time(nullptr));
   //无法确定能否通过size()方法的得到pointcloud对象中的pts数量
-  cout<<"=============="<<input_cloud.pts.size()<<"=================="<<endl;
   for (size_t i = 0; i < input_cloud.pts.size(); i++) {
 	//改变输入的数据结构，更换对应的读取方式
 	// const PointCloud<double>::PtData &p_c  = input_cloud->pts[i];
@@ -522,13 +521,9 @@ void initVoxel(
     }
 	delete temp_coor;
   }
-  cout<<"ttttttttttttttttttttttttttttttt"<<voxel_map.begin()->second->cloud->pts[0].x<<endl;
   for (auto iter = voxel_map.begin(); iter != voxel_map.end(); iter++) {
-	if(iter== voxel_map.begin()){
-		cout<<"pcsize:"<<iter->second->cloud->pts.size()<<endl;
-	}
 	
-    if (iter->second->cloud->pts.size() > 2000) {
+    if (iter->second->cloud->pts.size() > 100000) {
       down_sampling_voxel(*(iter->second->cloud), 0.02);
     }
   }
@@ -541,9 +536,7 @@ void initVoxel(
 void copyPointCloud(PointCloud<double> &cloud, PointCloud<double> &copy_container){
 	// cout<<"start copy"<<endl;
 	copy_container.pts.reserve(10000000);
-	cout<<"cloud->pts.size():"<<cloud.pts.size()<<endl;
 	// cout<<"cloud->pts.size()"<<cloud->pts[2489700].x<<endl;
-	cout<<"copy_container->pts[iter]:"<<cloud.pts[0].x<<endl;
 	
 	for (int i = 0; i < cloud.pts.size(); i++ ){
 		// copy_container.pts[i].x = cloud.pts[i].x;
@@ -552,5 +545,26 @@ void copyPointCloud(PointCloud<double> &cloud, PointCloud<double> &copy_containe
 		copy_container.pts.push_back({cloud.pts[i].x,cloud.pts[i].y,cloud.pts[i].z});
 		
 	}
-	cout<<"copy_container_size:"<<copy_container.pts.size()<<endl;
+}
+
+void turnFormat(PointCloud<double> &cloud, std::vector<std::vector<double>> &container){
+	for(auto iter=cloud.pts.begin(); iter != cloud.pts.end(); iter++){
+		// std::vector<double> *temp = new std::vector<double>;
+		container.push_back({iter->x, iter->y, iter->z});
+	}
+}
+
+void voxelNormal(const PCAInfo &pcaInfo, Voxel &v){
+	v.normal = pcaInfo.normal;
+}
+
+void calNormProj(const PCAInfo &pcaInfo, Voxel &v ){
+
+	Eigen::Vector3d PatchNormal;
+	PatchNormal << v.normal.val[0], v.normal.val[1], v.normal.val[2];
+	Eigen::Vector3d gra_nor;
+	gra_nor << 0.0,0.0,1.0;
+	double dot_product = PatchNormal.dot(gra_nor);
+
+	v.projDist = dot_product;
 }

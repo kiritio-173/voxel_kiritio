@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <Eigen/Core>
+#include <cstdio>
 
 #include "nanoflann.hpp"
 #include "utils.h"
@@ -91,6 +92,10 @@ typedef struct Voxel {
   Eigen::Vector3d voxel_origin;
   Eigen::Vector3d voxel_color;
   PointCloud<double> *cloud;
+  // 保存体素的法向量
+  cv::Matx31d normal;
+  double projDist;
+  Voxel(){};
   Voxel(float _size) : size(_size) {
     voxel_origin << 0, 0, 0;
     cloud = new PointCloud<double>;
@@ -119,6 +124,13 @@ void initVoxel(
     const float voxel_size, std::unordered_map<VOXEL_LOC, Voxel *> &voxel_map); 
 
 void copyPointCloud(PointCloud<double> &cloud, PointCloud<double> &copy_container);
+
+void turnFormat(PointCloud<double> &cloud, std::vector<std::vector<double>> &container);
+
+void voxelNormal(const PCAInfo &pcaInfo, Voxel &v);
+
+void calNormProj(const PCAInfo &pcaInfo, Voxel &v );
+
 
 /*******************************************************************************/
 #endif //_COMMON_FUNCTIONS_

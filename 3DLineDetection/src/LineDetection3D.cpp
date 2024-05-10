@@ -41,7 +41,7 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 	double totalTime = 0.0;
 	CTimer timer;
 	char msg[1024];
-	const float voxel_size = 2;
+	const float voxel_size = 0.5;
 	cout<<"voxel"<<endl;
 	std::unordered_map<VOXEL_LOC, Voxel *> voxel_map;
 	initVoxel(data, voxel_size, voxel_map);
@@ -49,57 +49,66 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 	/*************/
 	timer.Start();
 	cout<<endl;
+	int count=0;
+	double area = 0;
 	/*************/
 	// 修改为并行执行
+
+	const char* dataPath = "/home/gzz/zhu/ershuai/make_test/3DLineDetection-master-master/datasets/outcloud.txt";
+	if(remove(dataPath) != 0){
+		perror("Error deleting file");
+	}
+// #pragma omp parallel for
+
+	std::vector<Voxel > *voxel_out=new std::vector<Voxel > ;
 	for (auto iter = voxel_map.begin(); iter != voxel_map.end(); iter++) {
 		// 创建一个体素滤波器
 		PointCloud<double> *cloud_filter = new PointCloud<double>;
 		
-		//可能不能直接调用此点云复制，数据结构可能不支持
-		cout<<"copyPointCloud"<<endl;
-		cout<<iter->second->cloud->pts.size()<<endl;
-		
-		//cout<<"test point log"<<iter->second->cloud->pts[3].x<<endl;
+		//cout<<"copyPointCloud"<<endl;
+		//cout<<iter->second->cloud->pts.size()<<endl;
 		copyPointCloud(*(iter->second->cloud), *cloud_filter);
-		cout<<"finish copy"<<endl;
-		cout<<"cloud_filter_size"<<cloud_filter->pts.size()<<endl;
-		pointCloudSegmentation(*cloud_filter, regions);
+		//cout<<"finish copy"<<endl;
+
+		std::vector<std::vector<double>> *pointData = new std::vector<std::vector<double>>;
+		//cloud_filter中的点云格式转换
+		turnFormat(*cloud_filter, *pointData);
+		pointCloudSegmentation_ver2(*pointData, iter->second);
+		// cout<<"voxel normal: "<<endl;
+		// cout<<iter->second->normal<<endl;
+		// cout<<iter->second->normal.row(0).val[0]<<endl;
+
+		voxelFiltrate(iter->second,*voxel_out,55);
+
+		area += iter->second->cloud->pts.size() / 1116.0;
+		count++;
+		cout<<"count="<< count<<endl;
+		//exportVoxelCloud(iter->second,55, dataPath);
 		delete cloud_filter;
-
-		cout<<"Step2: Plane Based 3D LineDetection ..."<<endl;
-		planeBased3DLineDetection( regions, planes );
-
-		cout<<"Step3: Post Processing ..."<<endl;
-		postProcessing( planes, lines );
+		delete pointData;
 
 	}
+	cout<<"filtrate done. "<<endl;
+	cout<<"total voxel "<<voxel_out->size()<<endl;
+
+	std::map<int,std::vector<Voxel>> *voxel_all ;
+
+	//std::sort( voxel_map.begin(), voxel_map.end(), [](const Voxel &v1, const Voxel &v2) { return v1.projDist < v2.projDist; } );
+	// for (int idx = 0; idx < std::ceil(voxel_map.size()*0.20); idx++){
+	// 	auto iter = voxel_map.begin();
+
+
+	// 	iter++;
+	// }
+	
 	/*************/
+	timer.Stop();
 	totalTime += timer.GetElapsedSeconds();
 	timer.PrintElapsedTimeMsg(msg);
 	printf("  Point Cloud Segmentation Time: %s.\n\n", msg);
 	ts.push_back(timer.GetElapsedSeconds());
 	/*************/
 	// step1 end
-
-	// // step2: plane based 3D line detection
-	// timer.Start();
-	// cout<<"Step2: Plane Based 3D LineDetection ..."<<endl;
-	// planeBased3DLineDetection( regions, planes );
-	// timer.Stop();
-	// totalTime += timer.GetElapsedSeconds();
-	// timer.PrintElapsedTimeMsg(msg);
-	// printf("  Plane Based 3D LineDetection Time: %s.\n\n", msg);
-	// ts.push_back(timer.GetElapsedSeconds());
-
-	// // step3: post processing
-	// timer.Start();
-	// cout<<"Step3: Post Processing ..."<<endl;
-	// postProcessing( planes, lines );
-	// timer.Stop();
-	// totalTime += timer.GetElapsedSeconds();
-	// timer.PrintElapsedTimeMsg(msg);
-	// printf("  Post Processing Time: %s.\n\n", msg);
-	// ts.push_back(timer.GetElapsedSeconds());
 
 	printf("Total Time: %lf.\n\n", totalTime);
 }
@@ -123,6 +132,113 @@ void LineDetection3D::pointCloudSegmentation(PointCloud<double> &pointData, std:
 	double thAnglePatch = thAngle;
 	regionMerging( thAnglePatch, regions );
 	//exportRegionCloud(regions);
+}
+
+void LineDetection3D::pointCloudSegmentation_ver2(std::vector<std::vector<double>> &pointData, Voxel *v)
+{	
+	this->pointNum=pointData.size();
+	cout<<"----- Normal Calculation ..."<<endl;
+	PCAInfo PcaInfoObj;
+
+	PCAFunctions pcaer;
+
+	pcaer.PCASingle(pointData, PcaInfoObj);
+
+	voxelNormal(PcaInfoObj, *v);
+
+	calNormProj(PcaInfoObj, *v);
+
+}
+
+//筛选体素
+void LineDetection3D::voxelFiltrate(Voxel *v ,std::vector<Voxel> &voxel_tar,double degThre){
+	Eigen::Vector3d gra_nor;
+	Eigen::Vector3d v_n;
+	v_n<<v->normal.row(0).val[0],v->normal.row(1).val[0],v->normal.row(2).val[0];
+	gra_nor << 0.0,0.0,1.0;
+	double dot_product = v_n.dot(gra_nor);
+	double PatchNormal_norm = v_n.norm();
+	double angle_in_radians = std::acos(dot_product / (PatchNormal_norm ));
+	double angle_in_degrees = angle_in_radians * (180.0 / M_PI);
+	
+	if(angle_in_degrees<degThre || angle_in_degrees> 180-degThre){
+		
+	}
+	else{
+		cout<<"============="<<endl;
+		
+		voxel_tar.push_back({*v});
+		cout<<"v.size:"<<v->cloud->pts.size()<<endl;
+		cout<<"voxel_tar.size():"<<voxel_tar.size()<<endl;
+	}
+	
+}
+//随机种子点
+int LineDetection3D::getRandomSeedIndex(const std::vector<Voxel>& voxels) {
+	if (voxels.empty()) {
+		return -1; // 如果输入向量为空，返回 -1 表示未找到种子
+	}
+// 随机选择一个索引
+	return rand() % voxels.size();
+}
+
+void LineDetection3D::voelGrow(std::unordered_map<VOXEL_LOC, Voxel *> voxel_map ,std::vector<Voxel> &voxelseed,int seedindex){
+	
+	VOXEL_LOC positio=voxel_map
+	for(int dx=-1;dx<2;dx++){
+		for(int dy=-1;dy<2;dy++){
+			for(int dz=-1;dz<2;dz++){
+				int neighbor_x=position.x+dx*seed.size;
+				int neighbor_y=position.y+dy*seed.size;
+				int neighbor_z=position.z+dz*seed.size;
+
+				if(voxel_map.find({neighbor_x,neighbor_y,neighbor_z})){
+					voxelseed.push_back(voxel_map.find({neighbor_x,neighbor_y,neighbor_z}).second)
+					
+				}
+			} 
+
+		}
+	}
+}
+	
+
+
+void LineDetection3D::exportVoxelCloud(Voxel *v ,double degThre, const char* path){
+	ofstream outRegionPoints(path,std::ios::app);
+	if(!outRegionPoints.is_open()){
+		std::cerr<<"failed to open file" <<std::endl;
+		return;
+	}
+	Eigen::Vector3d gra_nor;
+	Eigen::Vector3d v_n;
+	v_n<<v->normal.row(0).val[0],v->normal.row(1).val[0],v->normal.row(2).val[0];
+	gra_nor << 0.0,0.0,1.0;
+	double dot_product = v_n.dot(gra_nor);
+	double PatchNormal_norm = v_n.norm();
+	double angle_in_radians = std::acos(dot_product / (PatchNormal_norm ));
+	double angle_in_degrees = angle_in_radians * (180.0 / M_PI);
+	vector<double> Point_color(3,0);
+	if(angle_in_degrees<degThre || angle_in_degrees> 180-degThre){
+		Point_color[0]=255;
+		Point_color[1]=255;
+		Point_color[2]=255;
+	}
+	else{
+		Point_color [0] = 255;
+		Point_color [1] = 0;
+		Point_color [2] = 0;
+	}
+	int pointNumCur = v->cloud->pts.size();
+	for ( int i=0; i<pointNumCur; ++i )
+	{
+		outRegionPoints<<v->cloud->pts[i].x<<" "<<
+		v->cloud->pts[i].y<<" "<<
+		v->cloud->pts[i].z<<" "<<
+		Point_color[0]<<" "<<Point_color[1]<<" "<<Point_color[2]<<std::endl;
+	}
+	outRegionPoints.close();
+	
 }
 
 void LineDetection3D::regionGrow( double thAngle, std::vector<std::vector<int> > &regions )
@@ -217,6 +333,7 @@ void LineDetection3D::regionGrow( double thAngle, std::vector<std::vector<int> >
 		}
 	}
 }
+
 void LineDetection3D::exportRegionCloud(const std::vector<std::vector<int> > regions ,std::vector<PCAInfo> patches,double degThre ){
 	ofstream outRegionPoints("/home/gzz/zhu/ershuai/code/region_points_parll_gra.txt");
 	if(!outRegionPoints.is_open()){
@@ -262,6 +379,7 @@ void LineDetection3D::exportRegionCloud(const std::vector<std::vector<int> > reg
 	outRegionPoints.close();
 
 }
+
 void LineDetection3D::exportRegionCloud( const std::vector<std::vector<int> > regions){
 	ofstream outRegionPoints("/home/gzz/zhu/ershuai/code/datasets/regionPoints.txt");
 	if(!outRegionPoints.is_open()){
@@ -520,6 +638,7 @@ void LineDetection3D::planeBased3DLineDetection( std::vector<std::vector<int> > 
 			pointDataCur[j][0] = this->pointData.pts[regions[i][j]].x;
 			pointDataCur[j][1] = this->pointData.pts[regions[i][j]].y;
 			pointDataCur[j][2] = this->pointData.pts[regions[i][j]].z;
+			
 		}
 
 		PCAFunctions pcaer;

@@ -28,11 +28,18 @@ public:
 	void run( PointCloud<double> &data, int k, std::vector<std::vector<int> > &regions, std::vector<PLANE> &planes, std::vector<std::vector<cv::Point3d> > &lines, std::vector<double> &ts );
 
 	void pointCloudSegmentation( PointCloud<double> &pointData, std::vector<std::vector<int> > &regions );
+	//修改版
+	void pointCloudSegmentation_ver2( std::vector<std::vector<double> > &rpointData, Voxel *v);
 
 	void planeBased3DLineDetection( std::vector<std::vector<int> > &regions, std::vector<PLANE> &planes );
 
 	void postProcessing( std::vector<PLANE> &planes, std::vector<std::vector<cv::Point3d> > &lines );
 
+	void voxelFiltrate(Voxel *v ,std::vector<Voxel> &voxel_tar,double degThre);
+
+	int getRandomSeedIndex(const std::vector<Voxel>& voxels);
+
+	void voelGrow(std::unordered_map<VOXEL_LOC, Voxel *> voxel_map ,std::vector<Voxel> &voxelseed,int seedindex);
 	// 
 	void regionGrow( double thAngle, std::vector<std::vector<int> > &regions );
 
@@ -48,6 +55,8 @@ public:
 	void outliersRemoval( std::vector<PLANE> &planes );
 
 	void lineMerging( std::vector<PLANE> &planes, std::vector<std::vector<cv::Point3d> > &lines );
+	
+	void exportVoxelCloud(Voxel *v ,double degThre, const char* path );
 
 public:
 	int k;
