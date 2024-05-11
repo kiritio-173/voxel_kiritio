@@ -41,7 +41,7 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 	double totalTime = 0.0;
 	CTimer timer;
 	char msg[1024];
-	const float voxel_size = 0.5;
+	const float voxel_size = 1;
 	cout<<"voxel"<<endl;
 	std::unordered_map<VOXEL_LOC, Voxel *> voxel_map;
 	initVoxel(data, voxel_size, voxel_map);
@@ -55,9 +55,9 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 	// 修改为并行执行
 
 	const char* dataPath = "/home/gzz/zhu/ershuai/make_test/3DLineDetection-master-master/datasets/outcloud.txt";
-	if(remove(dataPath) != 0){
-		perror("Error deleting file");
-	}
+	// if(remove(dataPath) != 0){
+	// 	perror("Error deleting file");
+	// }
 // #pragma omp parallel for
 
 	std::vector<Voxel > *voxel_out=new std::vector<Voxel > ;
@@ -65,8 +65,6 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 		// 创建一个体素滤波器
 		PointCloud<double> *cloud_filter = new PointCloud<double>;
 		
-		//cout<<"copyPointCloud"<<endl;
-		//cout<<iter->second->cloud->pts.size()<<endl;
 		copyPointCloud(*(iter->second->cloud), *cloud_filter);
 		//cout<<"finish copy"<<endl;
 
@@ -74,15 +72,12 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 		//cloud_filter中的点云格式转换
 		turnFormat(*cloud_filter, *pointData);
 		pointCloudSegmentation_ver2(*pointData, iter->second);
-		// cout<<"voxel normal: "<<endl;
-		// cout<<iter->second->normal<<endl;
-		// cout<<iter->second->normal.row(0).val[0]<<endl;
 
 		voxelFiltrate(iter->second,*voxel_out,55);
-
+		
 		area += iter->second->cloud->pts.size() / 1116.0;
-		count++;
-		cout<<"count="<< count<<endl;
+		// count++;
+		// cout<<"count="<< count<<endl;
 		//exportVoxelCloud(iter->second,55, dataPath);
 		delete cloud_filter;
 		delete pointData;
@@ -90,6 +85,40 @@ void LineDetection3D::run( PointCloud<double> &data, int k, std::vector<std::vec
 	}
 	cout<<"filtrate done. "<<endl;
 	cout<<"total voxel "<<voxel_out->size()<<endl;
+
+
+//这个地方的逻辑有问题,只是测试用,应该按区域遍历,对一个随机点增长完后删掉,更新voxel_out再对随机点便利
+
+//逻辑更新了一半,剩一个向量作差更新voxel_out;;;
+	std::vector<std::vector<Voxel>> *voxel_regions=new std::vector<std::vector<Voxel>>;
+	for(int i=0;voxel_out->size()!=0;i++){
+
+		cout<<"voxel_out.size="<<voxel_out->size()<<endl;
+		int seed_index=getRandomSeedIndex(*voxel_out);
+		cout<<"randomseed="<<seed_index<<endl;
+
+		std::vector<VOXEL_LOC> pos;//感觉可用new也可以不用
+		voxelGrow(voxel_out,pos,seed_index);
+		
+		std::vector<Voxel> *temp=new std::vector<Voxel>;
+		cout<<"===="<<endl;
+		for(int j=0;j<pos.size();j++){
+			temp->push_back(*(voxel_map.find(pos[j])->second));
+		}
+		std::vector<Voxel> differ;	
+		std::set_difference(voxel_out->begin(),voxel_out->end(),temp->begin(),temp->end(),std::back_inserter(differ));
+		*voxel_out=differ;
+		voxel_regions[i].push_back(*temp);
+	
+		cout<<"voxel_region.size()="<<voxel_regions->size()<<endl;
+		//下方加入voxel_out-temp后的向量,并更新为voxel_out;
+		//delete temp;
+
+	}
+
+	delete voxel_out;
+
+
 
 	std::map<int,std::vector<Voxel>> *voxel_all ;
 
@@ -137,7 +166,7 @@ void LineDetection3D::pointCloudSegmentation(PointCloud<double> &pointData, std:
 void LineDetection3D::pointCloudSegmentation_ver2(std::vector<std::vector<double>> &pointData, Voxel *v)
 {	
 	this->pointNum=pointData.size();
-	cout<<"----- Normal Calculation ..."<<endl;
+	// cout<<"----- Normal Calculation ..."<<endl;
 	PCAInfo PcaInfoObj;
 
 	PCAFunctions pcaer;
@@ -165,15 +194,14 @@ void LineDetection3D::voxelFiltrate(Voxel *v ,std::vector<Voxel> &voxel_tar,doub
 		
 	}
 	else{
-		cout<<"============="<<endl;
-		
-		voxel_tar.push_back({*v});
-		cout<<"v.size:"<<v->cloud->pts.size()<<endl;
-		cout<<"voxel_tar.size():"<<voxel_tar.size()<<endl;
+		// cout<<"============="<<endl;
+		voxel_tar.push_back(*v);
+		// cout<<"v.size:"<<v->cloud->pts.size()<<endl;
+		// cout<<"voxel_tar.size():"<<voxel_tar.size()<<endl;
 	}
 	
 }
-//随机种子点
+//随机种子点,得到随机int类型种子点;
 int LineDetection3D::getRandomSeedIndex(const std::vector<Voxel>& voxels) {
 	if (voxels.empty()) {
 		return -1; // 如果输入向量为空，返回 -1 表示未找到种子
@@ -181,25 +209,74 @@ int LineDetection3D::getRandomSeedIndex(const std::vector<Voxel>& voxels) {
 // 随机选择一个索引
 	return rand() % voxels.size();
 }
-
-void LineDetection3D::voelGrow(std::unordered_map<VOXEL_LOC, Voxel *> voxel_map ,std::vector<Voxel> &voxelseed,int seedindex){
-	
-	VOXEL_LOC positio=voxel_map
-	for(int dx=-1;dx<2;dx++){
-		for(int dy=-1;dy<2;dy++){
-			for(int dz=-1;dz<2;dz++){
-				int neighbor_x=position.x+dx*seed.size;
-				int neighbor_y=position.y+dy*seed.size;
-				int neighbor_z=position.z+dz*seed.size;
-
-				if(voxel_map.find({neighbor_x,neighbor_y,neighbor_z})){
-					voxelseed.push_back(voxel_map.find({neighbor_x,neighbor_y,neighbor_z}).second)
-					
-				}
-			} 
-
+//判断position是否相等
+bool LineDetection3D::isInvector(const std::vector<VOXEL_LOC> &voxel_locs,const VOXEL_LOC neighbor){
+	for(const auto& voxel_loc:voxel_locs){
+		if(voxel_loc.x==neighbor.x&&voxel_loc.y==neighbor.y&&voxel_loc.z==neighbor.z){
+			return true;
+		}
+		else{
+			return false;
 		}
 	}
+	return 0;
+}
+
+
+//输入高陡体素区域,存有某一块体素聚合结果的voxel_loc向量,随即种子点;;;得到一个区域的增长后的体素pos向量;
+void LineDetection3D::voxelGrow(std::vector<Voxel > *voxel_container_filter ,std::vector<VOXEL_LOC> &seedvoxels,int seedindex){
+
+	std::vector<VOXEL_LOC> voxel_locations;
+	float voxel_size;
+	for(auto iter = voxel_container_filter->begin(); iter != voxel_container_filter->end(); iter++){
+		VOXEL_LOC voxel_location=iter->LOC;
+		voxel_locations.push_back(voxel_location);
+		voxel_size=iter->size;
+		// cout<<"voxel_location_x"<<voxel_location.x<<endl;
+		// cout<<"voxel_location_y"<<voxel_location.y<<endl;
+	}
+	
+
+	VOXEL_LOC seedvoxel=voxel_locations[seedindex];
+	seedvoxels.push_back(seedvoxel);
+
+
+	for(int i=0; i<seedvoxels.size();i++){
+		VOXEL_LOC position = seedvoxels[i];
+		cout<<"iii="<<i<<endl;
+		for(int dx=-1;dx<2;dx++){
+			for(int dy=-1;dy<2;dy++){
+				for(int dz=-1;dz<2;dz++){
+					if(dx==0&&dy==0&&dz==0){
+						
+					}
+					else{
+						
+						int64_t neighbor_x=position.x+dx*voxel_size;
+						int64_t neighbor_y=position.y+dy*voxel_size;
+						int64_t neighbor_z=position.z+dz*voxel_size;
+						cout<<neighbor_x<<";"<<neighbor_y<<";"<<neighbor_z<<endl;
+						if(isInvector(voxel_locations,VOXEL_LOC(neighbor_x,neighbor_y,neighbor_z))){
+							cout<<neighbor_x<<";"<<neighbor_y<<";"<<neighbor_z<<endl;
+							auto iter=std::find(seedvoxels.begin(),seedvoxels.end(),VOXEL_LOC(neighbor_x,neighbor_y,neighbor_z));
+							if(iter==seedvoxels.end()){
+								cout<<"==grow=="<<endl;
+								seedvoxels.push_back({neighbor_x,neighbor_y,neighbor_z});
+					}
+					
+				}
+					}
+				
+				//pushback改为推回位置信息,在外部循环中可以用位置去索引点云, 
+			
+				} 
+
+			}
+		}
+	}
+
+	cout<<"neighbor_num="<<seedvoxels.size()<<endl;//检测
+	
 }
 	
 

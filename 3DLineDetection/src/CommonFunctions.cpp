@@ -513,6 +513,7 @@ void initVoxel(
       voxel_map[position]->voxel_origin[0] = position.x * voxel_size;
       voxel_map[position]->voxel_origin[1] = position.y * voxel_size;
       voxel_map[position]->voxel_origin[2] = position.z * voxel_size;
+	  voxel_map[position]->LOC = position;
       voxel_map[position]->cloud->pts.push_back(input_cloud.pts[i]);
     //   int r = rand() % 256;
     //   int g = rand() % 256;

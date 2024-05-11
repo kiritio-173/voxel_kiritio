@@ -69,6 +69,12 @@ public:
 
   VOXEL_LOC(int64_t vx = 0, int64_t vy = 0, int64_t vz = 0)
       : x(vx), y(vy), z(vz) {}
+  
+  VOXEL_LOC(const VOXEL_LOC &info){
+    x = info.x;
+    y = info.y;
+    z = info.z;
+  }
 
   bool operator==(const VOXEL_LOC &other) const {
     return (x == other.x && y == other.y && z == other.z);
@@ -92,6 +98,7 @@ typedef struct Voxel {
   Eigen::Vector3d voxel_origin;
   Eigen::Vector3d voxel_color;
   PointCloud<double> *cloud;
+  VOXEL_LOC LOC;
   // 保存体素的法向量
   cv::Matx31d normal;
   double projDist;
@@ -100,6 +107,22 @@ typedef struct Voxel {
     voxel_origin << 0, 0, 0;
     cloud = new PointCloud<double>;
   };
+
+  bool operator<(const Voxel &other) const{
+    return LOC.x<other.LOC.x&&LOC.y<other.LOC.y&&LOC.z<other.LOC.z;
+  }
+
+
+  Voxel (const Voxel &other){
+    cloud = new PointCloud<double>;
+    cloud->pts = other.cloud->pts;
+    size = other.size;
+    normal = other.normal;
+    projDist = other.projDist;
+    LOC = other.LOC;
+    voxel_origin = other.voxel_origin;
+    voxel_color = other.voxel_color;
+  }
   ~Voxel(){
     //释放构造函数中new的内存空间
     delete cloud;

@@ -179,8 +179,8 @@ void writeOutRegions( string filePath, PointCloud<double> pointData,std::vector<
 }
 int main() 
 {
-	string fileData = "/home/gzz/zhu/ershuai/code/test111.txt";
-	string fileOut  = "/home/gzz/zhu/ershuai/code/datasets";
+	string fileData = "/home/gzz/zhu/ershuai/make_test/3DLineDetection-master-master/test111.txt";
+	string fileOut  = "/home/gzz/zhu/ershuai/make_test/3DLineDetection-master-master/datasets";
 
 	// read in data
 	PointCloud<double> pointData; 

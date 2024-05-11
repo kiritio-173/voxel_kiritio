@@ -39,7 +39,9 @@ public:
 
 	int getRandomSeedIndex(const std::vector<Voxel>& voxels);
 
-	void voelGrow(std::unordered_map<VOXEL_LOC, Voxel *> voxel_map ,std::vector<Voxel> &voxelseed,int seedindex);
+	bool isInvector(const std::vector<VOXEL_LOC> &voxel_locs,const VOXEL_LOC neighbor);
+
+	void voxelGrow(std::vector<Voxel > *voxel_map ,std::vector<VOXEL_LOC> &voxelseed,int seedindex);
 	// 
 	void regionGrow( double thAngle, std::vector<std::vector<int> > &regions );
 

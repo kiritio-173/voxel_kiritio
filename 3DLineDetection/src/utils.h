@@ -58,6 +58,7 @@ struct PointCloud
 		this->pts    = info.pts;
 		return *this;
 	}
+	
 
 	// Must return the number of data points
 	inline size_t kdtree_get_point_count() const { return pts.size(); }
